@@ -1,0 +1,79 @@
+dependency:
+  name: galaxy
+  options:
+    requirements-file: requirements.yml
+
+driver:
+  name: podman
+  options:
+    network: molecule_default
+    privileged: true
+
+platforms:
+  - name: master-node-kubernetes
+    image: docker.io/library/almalinux:9.6
+    command: /sbin/init
+    privileged: true
+    pre_build_image: true
+    volumes:
+      - /sys/fs/cgroup:/sys/fs/cgroup:ro
+    capabilities:
+      - SYS_ADMIN
+    groups:
+      - kubernetes_master
+    network: molecule_default
+    ip: 172.18.0.2
+    exposed_ports:
+      - 6443:6443/tcp
+      - 10250:10250/tcp
+
+  - name: worker-node-kubernetes
+    image: docker.io/library/almalinux:9.6
+    command: /sbin/init
+    privileged: true
+    pre_build_image: true
+    volumes:
+      - /sys/fs/cgroup:/sys/fs/cgroup:ro
+    capabilities:
+      - SYS_ADMIN
+    groups:
+      - kubernetes_workers
+    network: molecule_default
+    ip: 172.18.0.3
+    exposed_ports:
+      - 10250:10250/tcp
+
+provisioner:
+  name: ansible
+  config_options:
+    defaults:
+      host_key_checking: false
+      interpreter_python: auto_silent
+    ssh_connection:
+      pipelining: false
+  inventory:
+    group_vars:
+      kubernetes_master:
+        ansible_user: root
+        ansible_connection: containers.podman.podman
+      kubernetes_workers:
+        ansible_user: root
+        ansible_connection: containers.podman.podman
+
+verifier:
+  name: ansible
+  lint:
+    name: ansible-lint
+
+scenario:
+  name: default
+  test_sequence:
+    - dependency
+    - lint
+    - destroy
+    - create
+    - converge
+    - idempotence
+    - verify
+    - cleanup
+    - destroy
